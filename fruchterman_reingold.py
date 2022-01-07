@@ -76,7 +76,7 @@ def layout_fr_re(A, seed=None):
 #раскраска вершин
 def create_colors(G):
     ids = list(G.nodes)
-    print(ids)
+    
     colors = []
 
     r=nx.get_node_attributes(G,"Pop")
@@ -103,15 +103,15 @@ def create_colors(G):
         else:
             color = "black"
         colors.append(color)
-    print(z)
+    
     carac = pd.DataFrame({ 'ID':ids, 'colors':colors })
-    print(carac)
+    
     carac = carac.set_index('ID')
-    print(carac)
+    
     carac = carac.reindex(G.nodes())
-    print(carac)
+   
     carac['colors'] = pd.Categorical(carac['colors'])
-    print(carac)
+ 
     return carac['colors']
 
 DataPathNodes="HR_genres.json"
@@ -135,28 +135,18 @@ for a,b1 in Data.items():
 
 df=pd.read_csv(DataPathEdges)
 
-print(0)
 for i in range(df.shape[0]):
 	ar=tuple(df.iloc[i].tolist())
 	G.add_edge(*ar)
 
-print(1)
-#colors = create_colors(G)
-
-
 colors=create_colors(G)
-print(colors)
-#fig=plt.figure(figsize=(80,80),facecolor="aquamarine")
 
 fig=plt.figure(figsize=(240,220))
 ax=fig.add_subplot(111)
 ax.patch.set_facecolor('lightblue')
-#fig.patch.set_facecolor('blue')
-#fig.patch.set_alpha(0.5)
-# Plot it
+
 pos=spring_layout(G)
-#print(pos)
-print(5)
+
 nx.draw_networkx_edges(G,
        pos,
     edge_color="black")
@@ -164,9 +154,5 @@ nx.draw_networkx_nodes(G,
       pos,
       node_size=550,
      node_color=colors)
-#nx.draw_networkx(
-#    G,with_labels=False,alpha=0.9,node_size=500,node_color=colors,edge_color="grey"
-#)
 
-#plt.show()
 plt.savefig('graph.png')
