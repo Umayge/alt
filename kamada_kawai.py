@@ -31,8 +31,6 @@ def F_cost(pos_vec, np, invdist, meanweight):
     sumpos = np.sum(pos_arr, axis=0)
     cost += 0.5 * meanweight * np.sum(sumpos ** 2)
     grad += meanweight * sumpos
-    #print(cost)
-    print(grad)
     return (cost, grad.ravel())
 
 def layout_k_k(dist_mtx, pos_arr):
@@ -50,7 +48,7 @@ def layout_k_k(dist_mtx, pos_arr):
      
     return optresult.x.reshape((-1, 2))
 
-def kamada_kawai_right_version(G):
+def kamada_kawai(G):
     
     center = np.zeros(2)
     nNodes = len(G)
