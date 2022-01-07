@@ -18,7 +18,6 @@ def fruchterman_reingold(G):
     if len(G) == 1:
         return {nx.utils.arbitrary_element(G.nodes()): center}
     A = nx.to_scipy_sparse_matrix(G, dtype="f")
-    print(A)
     pos = la(A)
     pos = dict(zip(G, pos))
     return pos
