@@ -6,7 +6,79 @@ import numpy as np
 import scipy as sp
 import scipy.optimize
 
+def F_cost(pos_vec, np, invdist, meanweight):
+    
+    nNodes = invdist.shape[0]
+    #приводим значения переданные в виде массива в прежний вид
+    pos_arr = pos_vec.reshape((nNodes,2))
+    #получаем расстояния от каждой вершыны до каждой из врешин в проекциях на оси x,y(думаю их можно рассматривать как векктора в пространстве)
+    p1=pos_arr[:, np.newaxis, :]
+    p2=pos_arr[np.newaxis, :, :]
+    delta = p1 - p2
+    #находим модули наших векторов, получаем матрицу расстояний между вершнами 
+    nodesep = np.linalg.norm(delta, axis=-1)
 
+    direction = np.einsum("ijk,ij->ijk", delta, 1 / (nodesep + np.eye(nNodes)))
+
+    offset = nodesep * invdist - 1.0
+    offset[np.diag_indices(nNodes)] = 0
+    #расчитываем сумарную энергию всей системы
+    cost = 0.5 * np.sum(offset ** 2)
+
+    grad = np.einsum("ij,ij,ijk->ik", invdist, offset, direction) - np.einsum("ij,ij,ijk->jk", invdist, offset, direction)
+
+    # прибавляем усреднённое значение,чтоб положение вершин было близко к началу координат
+    sumpos = np.sum(pos_arr, axis=0)
+    cost += 0.5 * meanweight * np.sum(sumpos ** 2)
+    grad += meanweight * sumpos
+    #print(cost)
+    print(grad)
+    return (cost, grad.ravel())
+
+def layout_k_k(dist_mtx, pos_arr):
+    
+    meanwt = 1e-3
+    inv_dist=1 / (dist_mtx + np.eye(dist_mtx.shape[0])*1e-3)
+    costargs = (np, inv_dist, meanwt)
+    optresult = sp.optimize.minimize(
+        F_cost,
+        pos_arr.ravel(),
+        method="L-BFGS-B",
+        args=costargs,
+        jac=True,
+    )
+     
+    return optresult.x.reshape((-1, 2))
+
+def kamada_kawai_right_version(G):
+    
+    center = np.zeros(2)
+    nNodes = len(G)
+    #проверка на наличае вершин в графе
+    if nNodes == 0:
+        return {}
+    #поиск кратчайших путей между вершинами
+    dist = dict(nx.shortest_path_length(G))
+   
+    dist_mtx = np.ones((nNodes, nNodes))
+    #создаём матрицу в клетках которой записаны кратчайшие пути между вершинами
+    for row, nr in enumerate(G):
+        if nr not in dist:
+            continue
+        rdist = dist[nr]
+        for col, nc in enumerate(G):
+            if nc not in rdist:
+                continue
+            dist_mtx[row][col] = rdist[nc]
+    
+   
+    #зхадаем изначальные позиции вершин
+    pos = nx.circular_layout(G)
+    pos_arr = np.array([pos[n] for n in G])
+    #расчет раскладки
+    pos = layout_k_k(dist_mtx, pos_arr)
+    return dict(zip(G, pos))
+#раскраска
 def create_colors(G):
     ids = list(G.nodes)
     print(ids)
@@ -41,82 +113,6 @@ def create_colors(G):
     carac = carac.reindex(G.nodes())
     carac['colors'] = pd.Categorical(carac['colors'])
     return carac['colors']
-
-def F_cost(pos_vec, np, invdist, meanweight):
-    
-    nNodes = invdist.shape[0]
-    #приводим значения переданные в виде массива в прежний вид
-    pos_arr = pos_vec.reshape((nNodes, 2))
-    #получаем расстояния от каждой вершыны до каждой из врешин в проекциях на оси x,y(думаю их можно рассматривать как векктора в пространстве)
-    p1=pos_arr[:, np.newaxis, :]
-    p2=pos_arr[np.newaxis, :, :]
-    delta = p1 - p2
-    #находим модули наших векторов, получаем матрицу расстояний между вершнами 
-    nodesep = np.linalg.norm(delta, axis=-1)
-
-    direction = np.einsum("ijk,ij->ijk", delta, 1 / (nodesep + np.eye(nNodes)))
-
-    offset = nodesep * invdist - 1.0
-    offset[np.diag_indices(nNodes)] = 0
-    #расчитываем сумарную энергию всей системы
-    cost = 0.5 * np.sum(offset ** 2)
-
-    grad = np.einsum("ij,ij,ijk->ik", invdist, offset, direction) - np.einsum("ij,ij,ijk->jk", invdist, offset, direction)
-
-    # прибавляем усреднённое значение,чтоб положение вершин было близко к началу координат
-    sumpos = np.sum(pos_arr, axis=0)
-    cost += 0.5 * meanweight * np.sum(sumpos ** 2)
-    grad += meanweight * sumpos
-    #print(cost)
-    print(grad)
-    return (cost, grad.ravel())
-
-def layout(dist_mtx, pos_arr):
-    
-    meanwt = 1e-3
-    inv_dist=1 / (dist_mtx + np.eye(dist_mtx.shape[0])*1e-3)
-    costargs = (np, inv_dist, meanwt, 2)
-    optresult = sp.optimize.minimize(
-        F_cost,
-        pos_arr.ravel(),
-        method="L-BFGS-B",
-        args=costargs,
-        jac=True,
-    )
-     
-    return optresult.x.reshape((-1, 2))
-
-def kamada_kawai(G):
-    
-    center = np.zeros(2)
-    nNodes = len(G)
-    #проверка на наличае вершин в графе
-    if nNodes == 0:
-        return {}
-    #поиск кратчайших путей между вершинами
-    dist = dict(nx.shortest_path_length(G))
-   
-    dist_mtx = np.ones((nNodes, nNodes))
-    #создаём матрицу в клетках которой записаны кратчайшие пути между вершинами
-    for row, noder in enumerate(G):
-        if noder not in dist:
-            continue
-        rdist = dist[noder]
-        for col, nodec in enumerate(G):
-            if nodec not in rdist:
-                continue
-            dist_mtx[row][col] = rdist[nodec]
-    
-   
-    #задаем изначальные позиции вершин
-    pos = nx.circular_layout(G, 2)
-    pos_array = np.array([pos[n] for n in G])
-    #расчет раскладки
-    pos = layout(dist_mtx, pos_array)
-
-    
-    return dict(zip(G, pos))
-
 
 
 
@@ -161,10 +157,10 @@ print(pos)
 print(5)
 nx.draw_networkx_edges(G,
        pos,
-    edge_color="black")
+    edge_color="grey")
 nx.draw_networkx_nodes(G,
       pos,
-      node_size=550,
+      node_size=500,
      node_color=colors)
 
 plt.savefig('graph.png')
